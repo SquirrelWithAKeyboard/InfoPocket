@@ -1,1 +1,210 @@
-THIS SITE IS UNDER CONSTRUCTION
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfoPocket</title>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-auth.js";
+        import { getDatabase, ref, push, remove, onValue } from "https://www.gstatic.com/firebasejs/11.5.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBc8Hxi4vdvqmgxIG5WeLAmWBdsMRP5L7U",
+            authDomain: "infopocket-424dd.firebaseapp.com",
+            databaseURL: "https://infopocket-424dd-default-rtdb.firebaseio.com/",
+            projectId: "infopocket-424dd",
+            storageBucket: "infopocket-424dd.appspot.com",
+            messagingSenderId: "621913703469",
+            appId: "1:621913703469:web:ad9a1aa9c7007b4b8f24a4",
+            measurementId: "G-7YG37RWEX5"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app);
+
+        let currentUser = null;
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            document.getElementById("userStatus").textContent = user ? `Logged in as ${user.email}` : "Not logged in";
+            document.getElementById("authSection").style.display = user ? "none" : "block";
+            document.getElementById("mainContent").style.display = user ? "block" : "none";
+            if (user) { loadNotes(); loadFlashcards(); loadSkills(); }
+        });
+
+        function signUp() {
+            createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+                .then(() => alert("Account created! Log in now."))
+                .catch(error => alert(error.message));
+        }
+
+        function login() {
+            signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+                .catch(error => alert(error.message));
+        }
+
+        function logout() {
+            signOut(auth);
+        }
+
+        function saveNote() {
+            if (!currentUser) return alert("Log in first.");
+            push(ref(db, `users/${currentUser.uid}/notes`), { text: noteInput.value }).then(() => {
+                noteInput.value = "";
+                loadNotes();
+            });
+        }
+
+        function deleteNote(id) {
+            remove(ref(db, `users/${currentUser.uid}/notes/${id}`));
+        }
+
+        function loadNotes() {
+            if (!currentUser) return;
+            onValue(ref(db, `users/${currentUser.uid}/notes`), (snapshot) => {
+                notesList.innerHTML = "";
+                snapshot.forEach(child => {
+                    const noteDiv = document.createElement("div");
+                    noteDiv.classList.add("note");
+                    noteDiv.innerHTML = `${child.val().text} <button onclick="deleteNote('${child.key}')">❌</button>`;
+                    notesList.appendChild(noteDiv);
+                });
+            });
+        }
+
+        function saveFlashcard() {
+            if (!currentUser) return alert("Log in first.");
+            push(ref(db, `users/${currentUser.uid}/flashcards`), { question: questionInput.value, answer: answerInput.value }).then(() => {
+                questionInput.value = "";
+                answerInput.value = "";
+                loadFlashcards();
+            });
+        }
+
+        function deleteFlashcard(id) {
+            remove(ref(db, `users/${currentUser.uid}/flashcards/${id}`));
+        }
+
+        function loadFlashcards() {
+            if (!currentUser) return;
+            onValue(ref(db, `users/${currentUser.uid}/flashcards`), (snapshot) => {
+                flashcardsList.innerHTML = "";
+                snapshot.forEach(child => {
+                    const card = document.createElement("div");
+                    card.classList.add("flashcard");
+
+                    const question = child.val().question;
+                    const answer = child.val().answer;
+                    let isShowingQuestion = true;
+
+                    card.textContent = question;
+                    card.onclick = () => {
+                        isShowingQuestion = !isShowingQuestion;
+                        card.textContent = isShowingQuestion ? question : answer;
+                    };
+
+                    const deleteBtn = document.createElement("button");
+                    deleteBtn.textContent = "❌";
+                    deleteBtn.onclick = (event) => {
+                        event.stopPropagation(); // Prevent card flipping when clicking delete
+                        deleteFlashcard(child.key);
+                    };
+
+                    card.appendChild(deleteBtn);
+                    flashcardsList.appendChild(card);
+                });
+            });
+        }
+
+        function saveSkill() {
+            if (!currentUser) return alert("Log in first.");
+            push(ref(db, "globalSkills"), { skill: skillInput.value, user: currentUser.email }).then(() => {
+                skillInput.value = "";
+                loadSkills();
+            });
+        }
+
+        function loadSkills() {
+            onValue(ref(db, "globalSkills"), (snapshot) => {
+                skillsList.innerHTML = "";
+                snapshot.forEach(child => {
+                    const skill = document.createElement("div");
+                    skill.classList.add("skill");
+                    skill.innerHTML = `<b>${child.val().skill}</b> - Shared by ${child.val().user}`;
+                    skillsList.appendChild(skill);
+                });
+            });
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll(".tab-content").forEach(el => el.style.display = "none");
+            document.getElementById(tab).style.display = "block";
+        }
+
+        window.signUp = signUp;
+        window.login = login;
+        window.logout = logout;
+        window.saveNote = saveNote;
+        window.deleteNote = deleteNote;
+        window.saveFlashcard = saveFlashcard;
+        window.deleteFlashcard = deleteFlashcard;
+        window.saveSkill = saveSkill;
+        window.switchTab = switchTab;
+    </script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #e0e0e0; text-align: center; margin: 0; }
+        .container { max-width: 400px; margin: 50px auto; padding: 20px; background: #1e1e1e; border-radius: 10px; }
+        h1 { color: #ffcc00; }
+        input, textarea { width: calc(100% - 20px); padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #444; background: #2b2b2b; color: #fff; }
+        button { padding: 5px; background: #ffcc00; color: black; border: none; border-radius: 5px; cursor: pointer; }
+        .tab-content { display: none; }
+        .flashcard, .note, .skill { background: #2b2b2b; padding: 10px; margin: 10px; border-radius: 5px; }
+        .navbar { position: fixed; bottom: 0; width: 100%; background: #333; padding: 10px; display: flex; justify-content: space-around; }
+        .nav-button { color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📌 InfoPocket</h1>
+        <p id="userStatus">Not logged in</p>
+
+        <div id="authSection">
+            <input type="email" id="emailInput" placeholder="Email">
+            <input type="password" id="passwordInput" placeholder="Password">
+            <button onclick="signUp()">Sign Up</button>
+            <button onclick="login()">Login</button>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <button onclick="logout()">Logout</button>
+
+            <div id="notesTab" class="tab-content">
+                <textarea id="noteInput" placeholder="Write a note..."></textarea>
+                <button onclick="saveNote()">Save Note</button>
+                <div id="notesList"></div>
+            </div>
+
+            <div id="flashcardsTab" class="tab-content">
+                <input id="questionInput" placeholder="Question">
+                <input id="answerInput" placeholder="Answer">
+                <button onclick="saveFlashcard()">Save Flashcard</button>
+                <div id="flashcardsList"></div>
+            </div>
+
+            <div id="skillsTab" class="tab-content">
+                <input id="skillInput" placeholder="Share a skill">
+                <button onclick="saveSkill()">Share</button>
+                <div id="skillsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="navbar">
+        <span class="nav-button" onclick="switchTab('notesTab')">📝 Notes</span>
+        <span class="nav-button" onclick="switchTab('flashcardsTab')">📚 Flashcards</span>
+        <span class="nav-button" onclick="switchTab('skillsTab')">🌍 Skills</span>
+    </div>
+</body>
+</html>
